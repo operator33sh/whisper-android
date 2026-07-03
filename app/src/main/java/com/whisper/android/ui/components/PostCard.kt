@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +32,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.whisper.android.data.PostUiModel
@@ -38,6 +42,17 @@ import com.whisper.android.ui.theme.interFamily
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private val imageUrlRegex = Regex(
+    """https?://\S+\.(?:jpg|jpeg|png|gif|webp)(\?\S*)?""",
+    RegexOption.IGNORE_CASE,
+)
+
+private fun extractImageUrls(content: String): List<String> =
+    imageUrlRegex.findAll(content).map { it.value }.toList()
+
+private fun stripImageUrls(content: String): String =
+    imageUrlRegex.replace(content, "").trim()
 
 @Composable
 fun PostCard(
@@ -48,8 +63,12 @@ fun PostCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var overflows by remember { mutableStateOf(false) }
+    var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
     val density = LocalDensity.current
     val maxHeightPx = with(density) { 400.dp.roundToPx() }
+
+    val imageUrls = remember(post.content) { extractImageUrls(post.content) }
+    val displayContent = remember(post.content) { stripImageUrls(post.content) }
 
     Column(
         modifier = Modifier
@@ -86,23 +105,45 @@ fun PostCard(
 
         Spacer(Modifier.height(8.dp))
 
-        SubcomposeLayout(modifier = Modifier.fillMaxWidth().clipToBounds()) { constraints ->
-            val placeables = subcompose("content") {
-                Text(
-                    text = post.content,
-                    fontFamily = crimsonProFamily,
-                    fontSize = 16.sp,
-                    color = Color(0xFF2D2D2D),
-                    lineHeight = 24.sp,
-                )
-            }.map { it.measure(constraints.copy(maxHeight = Int.MAX_VALUE)) }
+        if (displayContent.isNotBlank()) {
+            SubcomposeLayout(modifier = Modifier.fillMaxWidth().clipToBounds()) { constraints ->
+                val placeables = subcompose("content") {
+                    Text(
+                        text = displayContent,
+                        fontFamily = crimsonProFamily,
+                        fontSize = 16.sp,
+                        color = Color(0xFF2D2D2D),
+                        lineHeight = 24.sp,
+                    )
+                }.map { it.measure(constraints.copy(maxHeight = Int.MAX_VALUE)) }
 
-            val naturalHeight = placeables.maxOfOrNull { it.height } ?: 0
-            overflows = naturalHeight > maxHeightPx
-            val layoutHeight = if (expanded) naturalHeight else minOf(naturalHeight, maxHeightPx)
+                val naturalHeight = placeables.maxOfOrNull { it.height } ?: 0
+                overflows = naturalHeight > maxHeightPx
+                val layoutHeight = if (expanded) naturalHeight else minOf(naturalHeight, maxHeightPx)
 
-            layout(constraints.maxWidth, layoutHeight) {
-                placeables.forEach { it.placeRelative(0, 0) }
+                layout(constraints.maxWidth, layoutHeight) {
+                    placeables.forEach { it.placeRelative(0, 0) }
+                }
+            }
+        }
+
+        if (imageUrls.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                imageUrls.forEach { url ->
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(url)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { fullscreenImageUrl = url },
+                    )
+                }
             }
         }
 
@@ -137,6 +178,45 @@ fun PostCard(
                     color = Color(0xFF2D2D2D).copy(alpha = 0.5f),
                     modifier = Modifier.clickable { expanded = !expanded },
                 )
+            }
+        }
+    }
+
+    if (fullscreenImageUrl != null) {
+        Dialog(
+            onDismissRequest = { fullscreenImageUrl = null },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnClickOutside = true,
+            ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable { fullscreenImageUrl = null },
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(fullscreenImageUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .size(36.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                        .clickable { fullscreenImageUrl = null },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("×", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Light)
+                }
             }
         }
     }
