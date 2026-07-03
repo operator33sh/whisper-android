@@ -195,18 +195,29 @@ class NostrRepository(
                 Log.d("Whisper", "Event kind=${event.kind} id=${event.id.take(8)}")
                 when (event.kind) {
                     1 -> {
-                        // Store the event
-                        _allEvents.update { it + (event.id to event) }
+                        // Only process each event once (same event arrives from multiple relays)
+                        var isNew = false
+                        _allEvents.update { current ->
+                            if (current.containsKey(event.id)) {
+                                current
+                            } else {
+                                isNew = true
+                                current + (event.id to event)
+                            }
+                        }
 
-                        // Track reply counts via "e" tags
-                        event.tags
-                            .filter { tag -> tag.isNotEmpty() && tag[0] == "e" }
-                            .mapNotNull { tag -> tag.getOrNull(1) }
-                            .forEach { parentId ->
+                        if (isNew) {
+                            // Track reply counts — only count the direct parent (NIP-10):
+                            // prefer the "e" tag marked "reply", otherwise take the last "e" tag.
+                            val eTags = event.tags.filter { tag -> tag.isNotEmpty() && tag[0] == "e" }
+                            val directParentId = (eTags.find { tag -> tag.getOrNull(3) == "reply" }
+                                ?: eTags.lastOrNull())?.getOrNull(1)
+                            if (directParentId != null) {
                                 _replyCounts.update { counts ->
-                                    counts + (parentId to (counts.getOrDefault(parentId, 0) + 1))
+                                    counts + (directParentId to (counts.getOrDefault(directParentId, 0) + 1))
                                 }
                             }
+                        }
                     }
                     3 -> {
                         // Contact list from our own pubkey — sync follows
