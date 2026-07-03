@@ -35,6 +35,7 @@ class NostrRepository(
         private const val SUB_PRIVATE = "whisper-private"
         private const val SUB_GLOW = "whisper-glow"
         private const val SUB_PROFILES = "whisper-profiles"
+        private const val SUB_CONTACTS = "whisper-contacts"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -134,11 +135,26 @@ class NostrRepository(
             filters = listOf(NostrFilter(kinds = listOf(1), limit = 1000)),
         )
 
-        // Subscribe to Kind 1 replies (events with #e tags) to track referenced IDs
-        client.subscribe(
-            subscriptionId = SUB_PRIVATE,
-            filters = listOf(NostrFilter(kinds = listOf(1), limit = 1000)),
-        )
+        // Subscribe to Kind 1 events from followed authors (re-subscribes on follow/unfollow)
+        scope.launch {
+            _followedPubkeys
+                .collect { followed ->
+                    if (followed.isNotEmpty()) {
+                        client.subscribe(
+                            subscriptionId = SUB_PRIVATE,
+                            filters = listOf(NostrFilter(kinds = listOf(1), authors = followed.toList(), limit = 500)),
+                        )
+                    }
+                }
+        }
+
+        // Fetch our own contact list (Kind 3) from relays to sync follows
+        if (myPubkey != null) {
+            client.subscribe(
+                subscriptionId = SUB_CONTACTS,
+                filters = listOf(NostrFilter(kinds = listOf(3), authors = listOf(myPubkey), limit = 1)),
+            )
+        }
 
         // If we have a pubkey, subscribe to events that tag us
         if (myPubkey != null) {
@@ -183,6 +199,18 @@ class NostrRepository(
                                     counts + (parentId to (counts.getOrDefault(parentId, 0) + 1))
                                 }
                             }
+                    }
+                    3 -> {
+                        // Contact list from our own pubkey — sync follows
+                        if (event.pubkey == myPubkey) {
+                            val relayFollows = event.tags
+                                .filter { tag -> tag.isNotEmpty() && tag[0] == "p" }
+                                .mapNotNull { tag -> tag.getOrNull(1) }
+                                .toSet()
+                            if (relayFollows != _followedPubkeys.value) {
+                                saveFollows(relayFollows)
+                            }
+                        }
                     }
                     0 -> {
                         // Parse and store user profile
