@@ -99,6 +99,14 @@ class NostrRepository(
 
     fun getFollowedPubkeys(): Set<String> = _followedPubkeys.value
 
+    fun publishTextNote(content: String, hexPrivKey: String) {
+        scope.launch {
+            val event = EventSigner.createTextNote(content, hexPrivKey)
+            client.publish(event)
+            _allEvents.update { it + (event.id to event) }
+        }
+    }
+
     fun followUser(pubkey: String, hexPrivKey: String) {
         val updated = getFollowedPubkeys() + pubkey
         saveFollows(updated)
