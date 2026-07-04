@@ -377,6 +377,18 @@ private fun AuthorAvatar(pictureUrl: String?, displayName: String) {
 }
 
 private fun formatTimestamp(epochSeconds: Long): String {
-    val sdf = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
-    return sdf.format(Date(epochSeconds * 1000))
+    val date = Date(epochSeconds * 1000)
+    val datePart = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(date)
+    val diffMs = System.currentTimeMillis() - epochSeconds * 1000
+    val diffMinutes = diffMs / 60_000
+    val diffHours = diffMs / 3_600_000
+    val diffDays = diffMs / 86_400_000
+    val relative = when {
+        diffMinutes < 1 -> "just now"
+        diffMinutes < 60 -> "$diffMinutes minutes ago"
+        diffHours < 24 -> "$diffHours hours ago"
+        diffDays < 7 -> "$diffDays days ago"
+        else -> ""
+    }
+    return if (relative.isNotEmpty()) "$datePart · $relative" else datePart
 }
