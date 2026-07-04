@@ -264,4 +264,21 @@ class NostrRepository(
             }
         }
     }
+
+    fun repliesFlow(eventId: String): Flow<List<NostrEvent>> {
+        client.subscribe(
+            subscriptionId = "replies-$eventId",
+            filters = listOf(NostrFilter(kinds = listOf(1), eTags = listOf(eventId))),
+        )
+        return _allEvents.map { events ->
+            events.values
+                .filter { event ->
+                    val eTags = event.tags.filter { tag -> tag.isNotEmpty() && tag[0] == "e" }
+                    val directParentId = (eTags.find { tag -> tag.getOrNull(3) == "reply" }
+                        ?: eTags.lastOrNull())?.getOrNull(1)
+                    directParentId == eventId
+                }
+                .sortedBy { it.createdAt }
+        }
+    }
 }

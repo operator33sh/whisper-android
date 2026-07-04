@@ -42,6 +42,7 @@ import com.whisper.android.ui.theme.interFamily
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.flow.Flow
 
 private val imageUrlRegex = Regex(
     """https?://\S+\.(?:jpg|jpeg|png|gif|webp)(\?\S*)?""",
@@ -60,9 +61,11 @@ fun PostCard(
     isFollowing: Boolean,
     onFollowClick: () -> Unit,
     onUnfollowClick: () -> Unit,
+    getReplies: (String) -> Flow<List<PostUiModel>>,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var overflows by remember { mutableStateOf(false) }
+    var repliesExpanded by remember { mutableStateOf(false) }
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
     val density = LocalDensity.current
     val maxHeightPx = with(density) { 400.dp.roundToPx() }
@@ -163,10 +166,12 @@ fun PostCard(
                 )
                 if (post.replyCount > 0) {
                     Text(
-                        text = if (post.replyCount == 1) "+ 1 reply" else "+ ${post.replyCount} replies",
+                        text = if (repliesExpanded) "\u2212 ${post.replyCount} ${if (post.replyCount == 1) "reply" else "replies"}"
+                               else "+ ${post.replyCount} ${if (post.replyCount == 1) "reply" else "replies"}",
                         fontFamily = interFamily,
                         fontSize = 12.sp,
                         color = Color(0xFF2D2D2D).copy(alpha = 0.5f),
+                        modifier = Modifier.clickable { repliesExpanded = !repliesExpanded },
                     )
                 }
             }
@@ -179,6 +184,14 @@ fun PostCard(
                     modifier = Modifier.clickable { expanded = !expanded },
                 )
             }
+        }
+
+        if (repliesExpanded) {
+            Spacer(Modifier.height(8.dp))
+            ReplyTree(
+                eventId = post.id,
+                getReplies = getReplies,
+            )
         }
     }
 

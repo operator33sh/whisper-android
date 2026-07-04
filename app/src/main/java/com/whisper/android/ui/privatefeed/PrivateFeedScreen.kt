@@ -70,6 +70,7 @@ fun PrivateFeedScreen(vm: PrivateFeedViewModel = viewModel()) {
                         isFollowing = followedPubkeys.contains(post.authorPubkey),
                         onFollowClick = { vm.onFollowClicked(post.authorPubkey) },
                         onUnfollowClick = { vm.onUnfollowClicked(post.authorPubkey) },
+                        getReplies = vm::getRepliesFlow,
                     )
                 }
             }

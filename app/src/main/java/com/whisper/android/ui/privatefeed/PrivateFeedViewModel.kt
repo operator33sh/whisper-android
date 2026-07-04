@@ -8,6 +8,7 @@ import com.whisper.android.data.PostUiModel
 import com.whisper.android.data.UserProfile
 import com.whisper.android.nostr.NostrEvent
 import com.whisper.android.util.KeyUtils
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -59,6 +60,11 @@ class PrivateFeedViewModel(app: Application) : AndroidViewModel(app) {
         val hexPrivKey = getHexPrivKey() ?: return
         viewModelScope.launch { repository.unfollowUser(pubkey, hexPrivKey) }
     }
+
+    fun getRepliesFlow(eventId: String): Flow<List<PostUiModel>> =
+        combine(repository.repliesFlow(eventId), repository.replyCountsFlow(), repository.profilesFlow()) { events, counts, profiles ->
+            events.map { it.toUiModel(counts, profiles) }
+        }
 
     fun clearGlow() = repository.clearGlow()
 
