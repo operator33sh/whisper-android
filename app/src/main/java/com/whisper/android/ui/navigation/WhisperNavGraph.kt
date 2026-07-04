@@ -199,12 +199,11 @@ private fun FeedsHost(onLogout: () -> Unit) {
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "+",
-                        fontSize = 40.sp,
-                        color = Color(0xFFAAAAAA),
-                        fontWeight = FontWeight.Light,
-                        lineHeight = 40.sp,
-                        modifier = Modifier.padding(bottom = 8.dp),
+                        text = "w",
+                        fontSize = 22.sp,
+                        color = Color.Black,
+                        fontWeight = FontWeight.Normal,
+                        lineHeight = 22.sp,
                     )
                 }
             }
