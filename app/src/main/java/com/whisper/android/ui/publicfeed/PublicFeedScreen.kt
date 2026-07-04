@@ -69,6 +69,9 @@ fun PublicFeedScreen(vm: PublicFeedViewModel = viewModel()) {
                         isFollowing = followedPubkeys.contains(post.authorPubkey),
                         onFollowClick = { vm.onFollowClicked(post.authorPubkey) },
                         onUnfollowClick = { vm.onUnfollowClicked(post.authorPubkey) },
+                        followedPubkeys = followedPubkeys,
+                        onFollowReply = { vm.onFollowClicked(it) },
+                        onUnfollowReply = { vm.onUnfollowClicked(it) },
                         getReplies = vm::getRepliesFlow,
                         onReplySubmit = { content, parentId, parentPubkey, rootId ->
                             vm.onReplySubmit(content, parentId, parentPubkey, rootId)

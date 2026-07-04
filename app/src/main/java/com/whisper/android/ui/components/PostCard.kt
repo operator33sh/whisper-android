@@ -65,6 +65,9 @@ fun PostCard(
     isFollowing: Boolean,
     onFollowClick: () -> Unit,
     onUnfollowClick: () -> Unit,
+    followedPubkeys: Set<String>,
+    onFollowReply: (String) -> Unit,
+    onUnfollowReply: (String) -> Unit,
     getReplies: (String) -> Flow<List<PostUiModel>>,
     onReplySubmit: (content: String, parentEventId: String, parentPubkey: String, rootEventId: String?) -> Unit,
 ) {
@@ -207,6 +210,9 @@ fun PostCard(
             ReplyTree(
                 eventId = post.id,
                 getReplies = getReplies,
+                followedPubkeys = followedPubkeys,
+                onFollowClick = onFollowReply,
+                onUnfollowClick = onUnfollowReply,
                 onReplySubmit = onReplySubmit,
             )
         }

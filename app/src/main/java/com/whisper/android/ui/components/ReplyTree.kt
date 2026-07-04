@@ -44,14 +44,25 @@ import com.whisper.android.data.PostUiModel
 import com.whisper.android.ui.theme.crimsonProFamily
 import com.whisper.android.ui.theme.interFamily
 import kotlinx.coroutines.flow.Flow
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val borderColor = Color(0xFF2D2D2D).copy(alpha = 0.2f)
 private val textColor = Color(0xFF2D2D2D)
+
+private fun formatTimestamp(epochSeconds: Long): String {
+    val sdf = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+    return sdf.format(Date(epochSeconds * 1000))
+}
 
 @Composable
 fun ReplyTree(
     eventId: String,
     getReplies: (String) -> Flow<List<PostUiModel>>,
+    followedPubkeys: Set<String>,
+    onFollowClick: (String) -> Unit,
+    onUnfollowClick: (String) -> Unit,
     depth: Int = 0,
     rootEventId: String = eventId,
     onReplySubmit: (content: String, parentEventId: String, parentPubkey: String, rootEventId: String?) -> Unit,
@@ -80,6 +91,9 @@ fun ReplyTree(
             ReplyItem(
                 reply = reply,
                 getReplies = getReplies,
+                followedPubkeys = followedPubkeys,
+                onFollowClick = onFollowClick,
+                onUnfollowClick = onUnfollowClick,
                 depth = depth,
                 rootEventId = rootEventId,
                 onReplySubmit = onReplySubmit,
@@ -92,6 +106,9 @@ fun ReplyTree(
 private fun ReplyItem(
     reply: PostUiModel,
     getReplies: (String) -> Flow<List<PostUiModel>>,
+    followedPubkeys: Set<String>,
+    onFollowClick: (String) -> Unit,
+    onUnfollowClick: (String) -> Unit,
     depth: Int,
     rootEventId: String,
     onReplySubmit: (content: String, parentEventId: String, parentPubkey: String, rootEventId: String?) -> Unit,
@@ -102,45 +119,59 @@ private fun ReplyItem(
 
     Column(modifier = Modifier.padding(start = 8.dp)) {
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            if (reply.authorPictureUrl != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(reply.authorPictureUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape),
-                )
-            } else {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFDDDDDD)),
-                ) {
-                    Text(
-                        text = (reply.authorName ?: reply.authorPubkey).take(1).uppercase(),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF666666),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                if (reply.authorPictureUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(reply.authorPictureUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape),
                     )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFDDDDDD)),
+                    ) {
+                        Text(
+                            text = (reply.authorName ?: reply.authorPubkey).take(1).uppercase(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF666666),
+                        )
+                    }
                 }
+                Text(
+                    text = reply.authorName ?: (reply.authorPubkey.take(8) + "\u2026"),
+                    fontFamily = interFamily,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                    color = textColor.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Text(
-                text = reply.authorName ?: (reply.authorPubkey.take(8) + "\u2026"),
-                fontFamily = interFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 12.sp,
-                color = textColor.copy(alpha = 0.6f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            FollowButton(
+                isFollowing = followedPubkeys.contains(reply.authorPubkey),
+                onClick = if (followedPubkeys.contains(reply.authorPubkey))
+                    { { onUnfollowClick(reply.authorPubkey) } }
+                else
+                    { { onFollowClick(reply.authorPubkey) } },
             )
         }
 
@@ -156,24 +187,36 @@ private fun ReplyItem(
 
         Spacer(Modifier.height(4.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (reply.replyCount > 0 && depth < 3) {
-                Text(
-                    text = if (subExpanded) "\u2212 ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}"
-                           else "+ ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}",
-                    fontFamily = interFamily,
-                    fontSize = 11.sp,
-                    color = textColor.copy(alpha = 0.5f),
-                    modifier = Modifier.clickable { subExpanded = !subExpanded },
-                )
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = "Reply",
+                text = formatTimestamp(reply.createdAt),
                 fontFamily = interFamily,
                 fontSize = 11.sp,
                 color = textColor.copy(alpha = 0.5f),
-                modifier = Modifier.clickable { showReplyModal = true },
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (reply.replyCount > 0 && depth < 3) {
+                    Text(
+                        text = if (subExpanded) "\u2212 ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}"
+                               else "+ ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}",
+                        fontFamily = interFamily,
+                        fontSize = 11.sp,
+                        color = textColor.copy(alpha = 0.5f),
+                        modifier = Modifier.clickable { subExpanded = !subExpanded },
+                    )
+                }
+                Text(
+                    text = "Reply",
+                    fontFamily = interFamily,
+                    fontSize = 11.sp,
+                    color = textColor.copy(alpha = 0.5f),
+                    modifier = Modifier.clickable { showReplyModal = true },
+                )
+            }
         }
 
         if (subExpanded) {
@@ -181,6 +224,9 @@ private fun ReplyItem(
             ReplyTree(
                 eventId = reply.id,
                 getReplies = getReplies,
+                followedPubkeys = followedPubkeys,
+                onFollowClick = onFollowClick,
+                onUnfollowClick = onUnfollowClick,
                 depth = depth + 1,
                 rootEventId = rootEventId,
                 onReplySubmit = onReplySubmit,
