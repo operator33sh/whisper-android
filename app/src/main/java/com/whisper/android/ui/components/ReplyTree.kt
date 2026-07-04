@@ -1,16 +1,22 @@
 package com.whisper.android.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.whisper.android.data.PostUiModel
@@ -45,6 +53,8 @@ fun ReplyTree(
     eventId: String,
     getReplies: (String) -> Flow<List<PostUiModel>>,
     depth: Int = 0,
+    rootEventId: String = eventId,
+    onReplySubmit: (content: String, parentEventId: String, parentPubkey: String, rootEventId: String?) -> Unit,
 ) {
     if (depth > 3) return
 
@@ -71,6 +81,8 @@ fun ReplyTree(
                 reply = reply,
                 getReplies = getReplies,
                 depth = depth,
+                rootEventId = rootEventId,
+                onReplySubmit = onReplySubmit,
             )
         }
     }
@@ -81,8 +93,12 @@ private fun ReplyItem(
     reply: PostUiModel,
     getReplies: (String) -> Flow<List<PostUiModel>>,
     depth: Int,
+    rootEventId: String,
+    onReplySubmit: (content: String, parentEventId: String, parentPubkey: String, rootEventId: String?) -> Unit,
 ) {
     var subExpanded by remember { mutableStateOf(false) }
+    var showReplyModal by remember { mutableStateOf(false) }
+    var replyText by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.padding(start = 8.dp)) {
         Row(
@@ -138,15 +154,25 @@ private fun ReplyItem(
             lineHeight = 22.sp,
         )
 
-        if (reply.replyCount > 0 && depth < 3) {
-            Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(4.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (reply.replyCount > 0 && depth < 3) {
+                Text(
+                    text = if (subExpanded) "\u2212 ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}"
+                           else "+ ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}",
+                    fontFamily = interFamily,
+                    fontSize = 11.sp,
+                    color = textColor.copy(alpha = 0.5f),
+                    modifier = Modifier.clickable { subExpanded = !subExpanded },
+                )
+            }
             Text(
-                text = if (subExpanded) "\u2212 ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}"
-                       else "+ ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}",
+                text = "Reply",
                 fontFamily = interFamily,
                 fontSize = 11.sp,
                 color = textColor.copy(alpha = 0.5f),
-                modifier = Modifier.clickable { subExpanded = !subExpanded },
+                modifier = Modifier.clickable { showReplyModal = true },
             )
         }
 
@@ -156,7 +182,95 @@ private fun ReplyItem(
                 eventId = reply.id,
                 getReplies = getReplies,
                 depth = depth + 1,
+                rootEventId = rootEventId,
+                onReplySubmit = onReplySubmit,
             )
+        }
+    }
+
+    if (showReplyModal) {
+        Dialog(
+            onDismissRequest = { showReplyModal = false; replyText = "" },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .background(Color(0xFFF9F9F7), RoundedCornerShape(12.dp))
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Reply",
+                    fontFamily = interFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = textColor,
+                )
+                BasicTextField(
+                    value = replyText,
+                    onValueChange = { replyText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .background(Color.White, RoundedCornerShape(8.dp))
+                        .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                        .padding(10.dp),
+                    textStyle = LocalTextStyle.current.copy(
+                        fontFamily = interFamily,
+                        fontSize = 14.sp,
+                        color = textColor,
+                    ),
+                    decorationBox = { inner ->
+                        if (replyText.isEmpty()) {
+                            Text(
+                                "Write your reply\u2026",
+                                fontFamily = interFamily,
+                                fontSize = 14.sp,
+                                color = textColor.copy(alpha = 0.4f),
+                            )
+                        }
+                        inner()
+                    },
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontFamily = interFamily,
+                        fontSize = 13.sp,
+                        color = textColor.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .clickable { showReplyModal = false; replyText = "" }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (replyText.isNotBlank()) textColor else textColor.copy(alpha = 0.3f),
+                                RoundedCornerShape(6.dp),
+                            )
+                            .clickable(enabled = replyText.isNotBlank()) {
+                                onReplySubmit(replyText, reply.id, reply.authorPubkey, rootEventId)
+                                showReplyModal = false
+                                replyText = ""
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = "Whisper",
+                            fontFamily = interFamily,
+                            fontSize = 13.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
         }
     }
 }

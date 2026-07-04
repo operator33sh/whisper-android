@@ -61,6 +61,13 @@ class PrivateFeedViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repository.unfollowUser(pubkey, hexPrivKey) }
     }
 
+    fun onReplySubmit(content: String, parentEventId: String, parentPubkey: String, rootEventId: String?) {
+        val hexPrivKey = getHexPrivKey() ?: return
+        viewModelScope.launch {
+            repository.publishReply(content, hexPrivKey, parentEventId, parentPubkey, rootEventId)
+        }
+    }
+
     fun getRepliesFlow(eventId: String): Flow<List<PostUiModel>> =
         combine(repository.repliesFlow(eventId), repository.replyCountsFlow(), repository.profilesFlow()) { events, counts, profiles ->
             events.map { it.toUiModel(counts, profiles) }

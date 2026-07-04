@@ -107,6 +107,20 @@ class NostrRepository(
         }
     }
 
+    fun publishReply(
+        content: String,
+        hexPrivKey: String,
+        parentEventId: String,
+        parentPubkey: String,
+        rootEventId: String?,
+    ) {
+        scope.launch {
+            val event = EventSigner.createReply(content, hexPrivKey, parentEventId, parentPubkey, rootEventId)
+            client.publish(event)
+            _allEvents.update { it + (event.id to event) }
+        }
+    }
+
     fun followUser(pubkey: String, hexPrivKey: String) {
         val updated = getFollowedPubkeys() + pubkey
         saveFollows(updated)

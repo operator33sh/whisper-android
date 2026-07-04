@@ -15,6 +15,28 @@ object EventSigner {
         return buildAndSign(kind = 3, tags = tags, content = "", hexPrivKey = hexPrivKey)
     }
 
+    fun createReply(
+        content: String,
+        hexPrivKey: String,
+        parentEventId: String,
+        parentPubkey: String,
+        rootEventId: String?,
+    ): NostrEvent {
+        val tags = if (rootEventId != null && rootEventId != parentEventId) {
+            listOf(
+                listOf("e", rootEventId, "", "root"),
+                listOf("e", parentEventId, "", "reply"),
+                listOf("p", parentPubkey),
+            )
+        } else {
+            listOf(
+                listOf("e", parentEventId, "", "root"),
+                listOf("p", parentPubkey),
+            )
+        }
+        return buildAndSign(kind = 1, tags = tags, content = content, hexPrivKey = hexPrivKey)
+    }
+
     private fun buildAndSign(
         kind: Int,
         tags: List<List<String>>,
