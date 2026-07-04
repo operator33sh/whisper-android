@@ -52,8 +52,20 @@ private val borderColor = Color(0xFF2D2D2D).copy(alpha = 0.2f)
 private val textColor = Color(0xFF2D2D2D)
 
 private fun formatTimestamp(epochSeconds: Long): String {
-    val sdf = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
-    return sdf.format(Date(epochSeconds * 1000))
+    val date = Date(epochSeconds * 1000)
+    val datePart = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(date)
+    val diffMs = System.currentTimeMillis() - epochSeconds * 1000
+    val diffMinutes = diffMs / 60_000
+    val diffHours = diffMs / 3_600_000
+    val diffDays = diffMs / 86_400_000
+    val relative = when {
+        diffMinutes < 1 -> "just now"
+        diffMinutes < 60 -> "$diffMinutes minutes ago"
+        diffHours < 24 -> "$diffHours hours ago"
+        diffDays < 7 -> "$diffDays days ago"
+        else -> ""
+    }
+    return if (relative.isNotEmpty()) "$datePart · $relative" else datePart
 }
 
 @Composable
@@ -190,15 +202,15 @@ private fun ReplyItem(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
-                text = formatTimestamp(reply.createdAt),
-                fontFamily = interFamily,
-                fontSize = 11.sp,
-                color = textColor.copy(alpha = 0.5f),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column {
+                Text(
+                    text = formatTimestamp(reply.createdAt),
+                    fontFamily = interFamily,
+                    fontSize = 11.sp,
+                    color = textColor.copy(alpha = 0.5f),
+                )
                 if (reply.replyCount > 0 && depth < 3) {
                     Text(
                         text = if (subExpanded) "\u2212 ${reply.replyCount} ${if (reply.replyCount == 1) "reply" else "replies"}"
@@ -209,14 +221,14 @@ private fun ReplyItem(
                         modifier = Modifier.clickable { subExpanded = !subExpanded },
                     )
                 }
-                Text(
-                    text = "Reply",
-                    fontFamily = interFamily,
-                    fontSize = 11.sp,
-                    color = textColor.copy(alpha = 0.5f),
-                    modifier = Modifier.clickable { showReplyModal = true },
-                )
             }
+            Text(
+                text = "Reply",
+                fontFamily = interFamily,
+                fontSize = 11.sp,
+                color = textColor.copy(alpha = 0.5f),
+                modifier = Modifier.clickable { showReplyModal = true },
+            )
         }
 
         if (subExpanded) {
