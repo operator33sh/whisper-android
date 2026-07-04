@@ -6,7 +6,9 @@
     <application
         android:name=".WhisperApplication"
         android:allowBackup="false"
+        android:icon="@mipmap/mipmap"
         android:label="Whisper"
+        android:roundIcon="@mipmap/mipmap"
         android:theme="@style/Theme.Whisper">
         <activity
             android:name=".MainActivity"
